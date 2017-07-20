@@ -77,7 +77,7 @@ public class CommonMethod {
         try {
             date = sdf.parse(s);
         } catch (ParseException ex) {
-//            writeExceptionLog(ex.getStackTrace());
+            writeExceptionLog(ex.getStackTrace());
         }
         return date;
     }
@@ -181,17 +181,40 @@ public class CommonMethod {
     }
 
     public static void writeLog(String writer, String log) {
-
-        System.out.println("[" + writer + "] " + log);
+        Date now = new Date();
+        String date_file_name = getFormatDateString(now, CommonDefine.DATE_FORMAT_GUI);
+        String date_log = getFormatDateString(now, CommonDefine.DATE_FORMAT_DB);
+        String path = CommonDefine.LOG_FOLDER_NAME + "warehouse-" + date_file_name + "-log.log";
+        log = "[" + date_log + "][" + writer + "] : " + log;
+        File file = new File(path);
+        BufferedWriter bw = null;
+        try {
+            if (file.getParentFile() != null) {
+                file.getParentFile().mkdirs();
+            }
+            bw = new BufferedWriter(new FileWriter(file, true));
+            bw.newLine();
+            bw.write(log);
+        } catch (Exception e) {
+        } finally {
+            if (bw != null) {
+                try {
+                    bw.close();
+                } catch (IOException ex) {
+                }
+            }
+        }
     }
 
     public static void writeExceptionLog(StackTraceElement[] stackTraces) {
         if (stackTraces == null) {
             return;
         }
+        StringBuilder sb = new StringBuilder();
         for (StackTraceElement ste : stackTraces) {
-            writeLog("Exception", ste.toString());
+            sb.append(ste.toString());
         }
+        writeLog("Exception", sb.toString());
     }
 
     public static boolean copyObject(EntityComponent o1, EntityComponent o2) {
@@ -238,10 +261,20 @@ public class CommonMethod {
             for (int i = 0; i < fields.length; i++) {
                 Field f = fields[i];
                 String value = f.get(object).toString();
-                if (value.equals("0")) {
-                    sb.append("DEFAULT");
+                if (f.getType() == Long.TYPE || f.getType() == Integer.TYPE) {
+                    if (value.equals("0")) {
+                        sb.append("DEFAULT");
+                    } else {
+                        sb.append(value);
+                    }
+                } else if (f.getType() == Boolean.TYPE) {
+                    if (value.equals("true")) {
+                        sb.append("'1'");
+                    } else {
+                        sb.append("'0'");
+                    }
                 } else {
-                    sb.append(value);
+                    sb.append("'").append(value).append("'");
                 }
                 if (i < fields.length - 1) {
                     sb.append(",");
@@ -282,6 +315,11 @@ public class CommonMethod {
                         sb.append(f.getName()).append(" = ").append(next);
                     }
                     option.append(f.getName()).append(" = ").append(old);
+                } else if (f.getType() == Boolean.TYPE) {
+                    if (!b) {
+                        sb.append(f.getName()).append(" = ").append(next.equals("true") ? "1" : "0");
+                    }
+                    option.append(f.getName()).append(" = ").append(old.equals("true") ? "1" : "0");
                 } else {
                     if (!b) {
                         sb.append(f.getName()).append(" = ").append("'").append(next).append("'");
@@ -481,10 +519,10 @@ public class CommonMethod {
         sb.append("mysqldump -u").append(username).append(" -p").append(password).append(" ").append(database).append(" > ");
         sb.append(name);
         String filename = "backup.bat";
-        if(!createFile(filename, sb.toString())){
+        if (!createFile(filename, sb.toString())) {
             return false;
         }
-        if(!backupDatabase(filename)){
+        if (!backupDatabase(filename)) {
             return false;
         }
         return deleteFile(filename);
